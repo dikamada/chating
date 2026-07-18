@@ -179,15 +179,16 @@
                 <div class="profile-details">
                     <span class="profile-name" id="lbl-name">HVC User</span>
                     <span class="profile-phone" id="lbl-phone">-</span>
-                    <span class="profile-status" id="lbl-status">Lokal Aktif</span>
+                    <span class="profile-status" id="lbl-status">Online via Cloud Engine</span>
                 </div>
             </div>
             <div class="status-indicator">
                 <div class="dot-online" id="status-dot"></div>
-                <span class="txt-online" id="status-text">LOKAL ENGINE</span>
+                <span class="txt-online" id="status-text">CLOUD ENGINE</span>
             </div>
             <div class="noc-stats">
-                <span id="net-icon">📶 OFFLINE SAFE</span>
+                <span id="net-icon">📶 CLOUD SYNC</span>
+                <span id="byte-counter">0.00 KB</span>
             </div>
         </div>
         <h1>CHAT HVC TELKOMSEL</h1>
@@ -202,7 +203,7 @@
         <button class="custom-btn" id="clear-wp-btn">❌ Hapus BG</button>
         <button class="custom-btn" id="theme-btn">🌓 Mode</button>
         <button class="custom-btn" id="profile-setup-btn">⚙️ Profil</button>
-        <button class="custom-btn" id="clear-screen-btn" style="border-color: #d32f2f; color: #d32f2f;">🗑️ Kosongkan Chat</button>
+        <button class="custom-btn" id="clear-screen-btn" style="border-color: #d32f2f; color: #d32f2f;">🗑️ Clear Cloud</button>
         <div>
             <select id="user-select">
                 <option value="user1">User 1</option>
@@ -250,7 +251,7 @@
     <label>Nomor HP:</label>
     <input type="text" id="set-phone" placeholder="+62...">
     <label>Status WA:</label>
-    <input type="text" id="set-status" value="Lokal Aktif">
+    <input type="text" id="set-status" value="Online via Cloud Engine">
     <label>Foto Profil (URL):</label>
     <input type="text" id="set-avatar" placeholder="https://...">
     <div style="display:flex; gap:5px; margin-top:8px;">
@@ -261,7 +262,9 @@
 </div>
 
 <script>
-    // METODE INTERNAL LOKAL ENGINE MURNI (ANTI-MACET SERVER)
+    // Sinkronisasi dengan Database Utama Npoint Anda yang baru
+    const API_URL = "https://api.npoint.io/ceafae155434d40f2c3c";
+
     const chatArea = document.getElementById('chatArea');
     const chatInput = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -269,11 +272,35 @@
     const wpInput = document.getElementById('wp-input');
     const clearWpBtn = document.getElementById('clear-wp-btn');
     const appContainer = document.getElementById('appContainer');
+    
+    let totalBytes = 0;
 
-    // Menyiapkan penyimpanan lokal murni
-    if(!localStorage.getItem('local_messages')) {
-        localStorage.setItem('local_messages', JSON.stringify([]));
+    function addTraffic(bytes) {
+        totalBytes += bytes;
+        if(totalBytes < 1024 * 1024) {
+            document.getElementById('byte-counter').innerText = (totalBytes / 1024).toFixed(2) + " KB";
+        } else {
+            document.getElementById('byte-counter').innerText = (totalBytes / (1024 * 1024)).toFixed(2) + " MB";
+        }
     }
+
+    function updateNetworkStatus() {
+        if(navigator.onLine) {
+            document.getElementById('status-dot').className = "dot-online";
+            document.getElementById('status-text').innerHTML = "<b>ONLINE</b>";
+            if(navigator.connection) {
+                const type = navigator.connection.type;
+                document.getElementById('net-icon').innerText = (type === 'wifi') ? "📶 WiFi" : "📶 GSM";
+            }
+        } else {
+            document.getElementById('status-dot').className = "";
+            document.getElementById('status-text').innerHTML = "<i>offline</i>";
+        }
+    }
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    setInterval(updateNetworkStatus, 3000);
+    updateNetworkStatus();
 
     document.getElementById('profile-setup-btn').addEventListener('click', () => {
         document.getElementById('profileModal').style.display = 'flex';
@@ -296,7 +323,7 @@
     function resetProfile() {
         document.getElementById('set-name').value = "HVC User";
         document.getElementById('set-phone').value = "";
-        document.getElementById('set-status').value = "Lokal Aktif";
+        document.getElementById('set-status').value = "Online via Cloud Engine";
         document.getElementById('set-avatar').value = "";
         saveProfile();
     }
@@ -308,7 +335,6 @@
         document.getElementById('imageOverlay').style.display = 'flex';
     }
 
-    // Metode Ganti & Hapus Wallpaper Lokal (Terbukti Lancar)
     wpInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
@@ -327,11 +353,17 @@
         else document.documentElement.setAttribute('data-theme', 'light');
     });
 
-    // Tombol Clear Total Layar Terbukti Berfungsi
-    document.getElementById('clear-screen-btn').addEventListener('click', () => {
-        if(confirm("Hapus seluruh isi percakapan di layar?")) {
-            localStorage.setItem('local_messages', JSON.stringify([]));
-            renderChat([]);
+    document.getElementById('clear-screen-btn').addEventListener('click', async () => {
+        if(confirm("Hapus semua chat di server cloud secara permanen?")) {
+            try {
+                const emptyData = { messages: [] };
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(emptyData)
+                });
+                if(res.ok) { renderChat([]); addTraffic(50); }
+            } catch (e) { alert("Gagal membersihkan database."); }
         }
     });
 
@@ -340,11 +372,16 @@
         this.style.height = (this.scrollHeight) + 'px';
     });
 
-    // Memuat data secara lokal instan
-    function loadMessages() {
-        const dataText = localStorage.getItem('local_messages');
-        const messages = JSON.parse(dataText) || [];
-        renderChat(messages);
+    // Menarik Data dari Cloud secara berkala otomatis tanpa interupsi
+    async function loadMessages() {
+        try {
+            const res = await fetch(API_URL);
+            if (!res.ok) return;
+            const textData = await res.clone().text();
+            addTraffic(textData.length);
+            const data = await res.json();
+            if (data && data.messages) { renderChat(data.messages); }
+        } catch (e) { console.error(e); }
     }
 
     function renderChat(messages) {
@@ -385,74 +422,99 @@
         if (isAtBottom) chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    // Eksekusi Kirim Terpusat Murni Lokal (Pasti Berhasil)
-    function sendLocalData(content, cType = 'text') {
+    // Polling sinkronisasi global tiap 3 detik otomatis
+    setInterval(loadMessages, 3000);
+    loadMessages();
+
+    // Sistem pengiriman berbasis Cloud Fetch Terpercaya
+    async function sendData(content, cType = 'text') {
         const user = userSelect.value;
         const now = new Date();
         const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
         const dateStr = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth()+1).padStart(2, '0') + '/' + now.getFullYear();
 
-        const dataText = localStorage.getItem('local_messages');
-        let currentMessages = JSON.parse(dataText) || [];
+        try {
+            const res = await fetch(API_URL);
+            let currentData = { messages: [] };
+            if (res.ok) {
+                currentData = await res.json();
+                if (!currentData.messages) currentData.messages = [];
+            }
 
-        currentMessages.push({ user: user, text: content, type: cType, time: timeStr, date: dateStr });
-        localStorage.setItem('local_messages', JSON.stringify(currentMessages));
+            currentData.messages.push({ user: user, text: content, type: cType, time: timeStr, date: dateStr });
 
-        chatInput.value = '';
-        chatInput.style.height = '42px';
-        loadMessages();
+            // Pengiriman via POST yang sudah disinkronkan CORS aman bypass
+            const sendRes = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentData)
+            });
+            
+            if(sendRes.ok) {
+                chatInput.value = '';
+                chatInput.style.height = '42px';
+                loadMessages(); // Langsung render update chat terbaru
+            }
+        } catch (e) { alert("Gagal mengirim data ke server cloud!"); }
     }
 
-    sendBtn.addEventListener('click', function(e) {
-        e.preventDefault();
+    function triggerSendAction() {
         const val = chatInput.value.trim();
-        if(val) sendLocalData(val, 'text');
-    });
+        if(val) sendData(val, 'text');
+    }
+
+    sendBtn.addEventListener('click', function(e) { e.preventDefault(); triggerSendAction(); });
+    sendBtn.addEventListener('touchstart', function(e) { e.preventDefault(); triggerSendAction(); });
 
     chatInput.addEventListener('keydown', (e) => {
-        if(e.key === 'Enter' && !e.shiftKey) { 
-            e.preventDefault(); 
-            const val = chatInput.value.trim();
-            if(val) sendLocalData(val, 'text');
-        }
+        if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); triggerSendAction(); }
     });
 
-    // Metode Unggah Media Memakai Pembacaan File Lokal (Persis Seperti Wallpaper)
-    function uploadLocalMedia(file, targetType) {
+    // Metode Unggah Media Memakai Pembacaan Temporary Server 30 Hari
+    async function uploadMedia(file, targetType) {
         if(!file) return;
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            sendLocalData(event.target.result, targetType);
-        };
-        reader.readAsDataURL(file);
+        chatInput.placeholder = "Mengunggah data ke cloud 30 hari...";
+        chatInput.disabled = true;
+        const fd = new FormData();
+        fd.append("reqtype", "fileupload");
+        fd.append("time", "720h");
+        fd.append("fileToUpload", file);
+
+        try {
+            const res = await fetch("https://corsproxy.io/?" + encodeURIComponent("https://litterbox.catbox.moe/resources/internals/api.php"), { method: "POST", body: fd });
+            if(res.ok) { const url = await res.text(); sendData(url, targetType); }
+            else { alert("Upload media gagal."); }
+        } catch(e) { alert("Kesalahan koneksi upload media cloud."); }
+        finally {
+            chatInput.placeholder = "Ketik pesan di sini..."; chatInput.disabled = false;
+            document.getElementById('media-input').value = ''; document.getElementById('video-input').value = '';
+            document.getElementById('audio-input').value = ''; document.getElementById('doc-input').value = ''; document.getElementById('cam-input').value = '';
+        }
     }
 
     document.getElementById('media-input').addEventListener('change', (e) => {
         const isStk = confirm("Kirim sebagai STICKER?\n(OK = Sticker, Cancel = Gambar biasa)");
-        uploadLocalMedia(e.target.files[0], isStk ? 'sticker' : 'image');
+        uploadMedia(e.target.files[0], isStk ? 'sticker' : 'image');
     });
-    document.getElementById('video-input').addEventListener('change', (e) => uploadLocalMedia(e.target.files[0], 'video'));
-    document.getElementById('audio-input').addEventListener('change', (e) => uploadLocalMedia(e.target.files[0], 'audio'));
-    document.getElementById('doc-input').addEventListener('change', (e) => uploadLocalMedia(e.target.files[0], 'doc'));
-    document.getElementById('cam-input').addEventListener('change', (e) => uploadLocalMedia(e.target.files[0], 'camera'));
+    document.getElementById('video-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'video'));
+    document.getElementById('audio-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'audio'));
+    document.getElementById('doc-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'doc'));
+    document.getElementById('cam-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'camera'));
 
     function sendContact() {
         const name = prompt("Masukkan nama kontak:");
         const phone = prompt("Masukkan nomor telepon:");
-        if(name && phone) sendLocalData({name, phone}, 'contact');
+        if(name && phone) sendData({name, phone}, 'contact');
     }
     
     function sendLocation() {
-        const lat = prompt("Masukkan Latitude (Atau isi asal untuk simulasi):", "-6.200000");
-        const lng = prompt("Masukkan Longitude:", "106.816666");
-        if(lat && lng) {
-            const url = `https://www.google.com/maps?q=${lat},${lng}`;
-            sendLocalData(url, 'location');
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const url = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                sendData(url, 'location');
+            }, () => { sendData("https://www.google.com/maps?q=-6.200000,106.816666", 'location'); });
         }
     }
-
-    // Jalankan mesin pertama kali
-    loadMessages();
 </script>
 </body>
 </html>
