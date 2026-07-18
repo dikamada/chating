@@ -132,37 +132,64 @@
         .msg-date-left { font-family: sans-serif; }
         .msg-time-right { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #ffcc00; }
 
-        /* INPUT AREA AMAN DARI KEYBOARD & BATAS LAYAR */
+        /* INPUT AREA DIUPGRADE AGAR TIDAK BISA TERTUTUP APAPUN */
         .input-container {
             background-color: var(--bg-input);
-            padding: 10px 10px 25px 10px; 
+            padding: 12px 12px 30px 12px; 
             border-top: 2px solid #ffcc00;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
-        /* Baris Utama: Textarea dan Kirim di atas */
-        .input-row { display: flex; gap: 8px; align-items: flex-end; width: 100%; }
+        /* Baris Teks dan Tombol Kirim */
+        .input-row { 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            width: 100%; 
+            position: relative;
+        }
         textarea {
             flex: 1; background-color: var(--bg-textarea); border: 1px solid var(--border-color);
             color: var(--text-main); padding: 10px 14px; border-radius: 20px;
             resize: none; height: 42px; max-height: 90px; font-size: 14px; outline: none;
         }
+        
+        /* Proteksi Mutlak Tombol Kirim dari Tindihan Elemen Lain */
         .send-btn {
-            background-color: #ffcc00; color: #000; border: none;
-            width: 42px; height: 42px; border-radius: 50%;
-            font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 18px; z-index: 10;
+            background-color: #ffcc00; 
+            color: #000000; 
+            border: none;
+            width: 45px; 
+            height: 45px; 
+            border-radius: 50%;
+            font-weight: bold; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 20px; 
+            flex-shrink: 0;
+            /* Proteksi Z-Index & Pointer */
+            position: relative;
+            z-index: 99999 !important;
+            pointer-events: auto !important;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        }
+        .send-btn:active {
+            background-color: #e6b800;
+            transform: scale(0.95);
         }
 
-        /* Tombol Lampiran Media */
+        /* Tombol Lampiran Media (Diberi margin top agar terpisah mutlak dari tombol kirim) */
         .media-pickers {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 6px;
             width: 100%;
+            margin-top: 4px;
         }
         .media-pickers label, .media-pickers button {
             cursor: pointer; color: #ffcc00; background: #2a2a2a;
@@ -236,14 +263,13 @@
 
     <!-- INPUT CONTAINER -->
     <div class="input-container">
-        <!-- Input Teks Utama -->
+        <!-- Baris Utama Input Teks & Tombol Kirim Proteksi Paling Atas -->
         <div class="input-row">
             <textarea id="chatInput" placeholder="Ketik pesan di sini..."></textarea>
-            <!-- Perbaikan Lapis 1: Menambahkan langsung fungsi klik onclick manual -->
-            <button class="send-btn" id="sendBtn" onclick="triggerSendAction()">➤</button>
+            <button class="send-btn" id="sendBtn">➤</button>
         </div>
         
-        <!-- Tombol Lampiran Media -->
+        <!-- Baris Tombol Lampiran Media di Bawah Sendiri -->
         <div class="media-pickers">
             <label>📷 Foto <input type="file" id="media-input" accept="image/*"></label>
             <label>🎥 Video <input type="file" id="video-input" accept="video/*"></label>
@@ -477,7 +503,6 @@
         } catch (e) { alert("Gagal mengirim data!"); }
     }
 
-    // Fungsi Lapis Eksekusi Tombol Kirim Utama
     function triggerSendAction() {
         const val = chatInput.value.trim();
         if(val) {
@@ -485,8 +510,14 @@
         }
     }
 
-    // Perbaikan Lapis 2: Tetap pasang event listener cadangan
-    sendBtn.addEventListener('click', () => {
+    // Eksekusi Pemicu Sentuhan Layar Langsung (Untuk HP Android)
+    sendBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        triggerSendAction();
+    });
+    
+    sendBtn.addEventListener('touchstart', function(e) {
+        e.preventDefault();
         triggerSendAction();
     });
 
@@ -527,7 +558,7 @@
     document.getElementById('doc-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'doc'));
     document.getElementById('cam-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'camera'));
 
-    稳定function sendContact() {
+    function sendContact() {
         const name = prompt("Masukkan nama kontak:");
         const phone = prompt("Masukkan nomor telepon:");
         if(name && phone) sendData({name, phone}, 'contact');
