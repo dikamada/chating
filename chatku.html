@@ -132,10 +132,10 @@
         .msg-date-left { font-family: sans-serif; }
         .msg-time-right { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #ffcc00; }
 
-        /* INPUT AREA DIATAS METERAN MEDIA & BATAS LAYAR (SOLUSI KEYBOARD) */
+        /* INPUT AREA AMAN DARI KEYBOARD & BATAS LAYAR */
         .input-container {
             background-color: var(--bg-input);
-            padding: 10px 10px 25px 10px; /* Ditambah padding bawah tebal agar tidak mepet dasar layar */
+            padding: 10px 10px 25px 10px; 
             border-top: 2px solid #ffcc00;
             flex-shrink: 0;
             display: flex;
@@ -154,10 +154,10 @@
             background-color: #ffcc00; color: #000; border: none;
             width: 42px; height: 42px; border-radius: 50%;
             font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            font-size: 18px;
+            font-size: 18px; z-index: 10;
         }
 
-        /* Baris Tombol Lampiran Media Diatur Rapi di Bawah Input Teks */
+        /* Tombol Lampiran Media */
         .media-pickers {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -189,6 +189,7 @@
 <body>
 
 <div class="app-container" id="appContainer">
+    <!-- HEADER -->
     <header>
         <div class="header-top-info">
             <div class="profile-section">
@@ -211,6 +212,7 @@
         <h1>CHAT HVC TELKOMSEL</h1>
     </header>
 
+    <!-- CONTROL PANEL -->
     <div class="control-panel">
         <div class="wp-btn-wrapper">
             <button class="custom-btn">🖼️ Ubah BG</button>
@@ -229,14 +231,19 @@
         </div>
     </div>
 
+    <!-- AREA CHAT BOX -->
     <div class="chat-area" id="chatArea"></div>
 
+    <!-- INPUT CONTAINER -->
     <div class="input-container">
+        <!-- Input Teks Utama -->
         <div class="input-row">
             <textarea id="chatInput" placeholder="Ketik pesan di sini..."></textarea>
-            <button class="send-btn" id="sendBtn">➤</button>
+            <!-- Perbaikan Lapis 1: Menambahkan langsung fungsi klik onclick manual -->
+            <button class="send-btn" id="sendBtn" onclick="triggerSendAction()">➤</button>
         </div>
         
+        <!-- Tombol Lampiran Media -->
         <div class="media-pickers">
             <label>📷 Foto <input type="file" id="media-input" accept="image/*"></label>
             <label>🎥 Video <input type="file" id="video-input" accept="video/*"></label>
@@ -248,15 +255,18 @@
         </div>
     </div>
 
+    <!-- FOOTER -->
     <footer>
         WhatsApp Buatanku
     </footer>
 </div>
 
+<!-- OVERLAY PREVIEW GAMBAR ASLI -->
 <div class="overlay-modal" id="imageOverlay" onclick="this.style.display='none'">
     <img src="" id="overlayImg">
 </div>
 
+<!-- MODAL SETUP PROFIL -->
 <div class="setup-modal" id="profileModal">
     <strong>Pengaturan Profil WA</strong>
     <label>Nama Profile:</label>
@@ -467,13 +477,24 @@
         } catch (e) { alert("Gagal mengirim data!"); }
     }
 
-    sendBtn.addEventListener('click', () => {
+    // Fungsi Lapis Eksekusi Tombol Kirim Utama
+    function triggerSendAction() {
         const val = chatInput.value.trim();
-        if(val) sendData(val, 'text');
+        if(val) {
+            sendData(val, 'text');
+        }
+    }
+
+    // Perbaikan Lapis 2: Tetap pasang event listener cadangan
+    sendBtn.addEventListener('click', () => {
+        triggerSendAction();
     });
 
     chatInput.addEventListener('keydown', (e) => {
-        if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); }
+        if(e.key === 'Enter' && !e.shiftKey) { 
+            e.preventDefault(); 
+            triggerSendAction(); 
+        }
     });
 
     async function uploadMedia(file, targetType) {
@@ -506,7 +527,7 @@
     document.getElementById('doc-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'doc'));
     document.getElementById('cam-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'camera'));
 
-    function sendContact() {
+    稳定function sendContact() {
         const name = prompt("Masukkan nama kontak:");
         const phone = prompt("Masukkan nomor telepon:");
         if(name && phone) sendData({name, phone}, 'contact');
