@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Our Private Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
+        #chat { height: 300px; overflow-y: scroll; border: 1px solid #ccc; background: white; padding: 10px; margin-bottom: 10px; }
+        .msg { margin-bottom: 5px; padding: 5px; border-bottom: 1px solid #eee; }
+        .img-preview { max-width: 150px; display: block; }
+    </style>
+</head>
+<body>
+    <div id="chat">Loading...</div>
+    <input type="text" id="input" placeholder="Pesan...">
+    <button onclick="send()">Kirim</button>
+    <input type="file" id="file" accept="image/*">
+    <button onclick="uploadMedia()">Upload Foto</button>
+
+    <script>
+        const API_URL = "https://api.npoint.io/8da8f76e45236f287087"; // Ganti ID di sini
+
+        // 1. Ambil pesan setiap 3 detik
+        setInterval(loadMessages, 3000);
+
+        async function loadMessages() {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            const chatBox = document.getElementById('chat');
+            chatBox.innerHTML = data.messages.map(m => `
+                <div class="msg">
+                    <b>${m.user}:</b> ${m.type === 'img' ? `<img src="${m.text}" class="img-preview">` : m.text}
+                </div>
+            `).join('');
+        }
+
+        async function send(text = null, type = 'text') {
+            const input = document.getElementById('input');
+            const msg = text || input.value;
+            if(!msg) return;
+
+            // Ambil data lama dulu
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            data.messages.push({ user: "Me", text: msg, type: type });
+
+            // Simpan data baru
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            input.value = "";
+            loadMessages();
+        }
+
+        // Upload ke Litterbox (auto-delete 30 hari)
+        async function uploadMedia() {
+            const file = document.getElementById('file').files[0];
+            const formData = new FormData();
+            formData.append("reqtype", "fileupload");
+            formData.append("time", "720h"); // 30 hari
+            formData.append("fileToUpload", file);
+
+            const res = await fetch("https://corsproxy.io/?https://litterbox.catbox.moe/resources/internals/api.php", {
+                method: "POST", body: formData
+            });
+            const url = await res.text();
+            send(url, 'img');
+        }
+    </script>
+</body>
+</html>
