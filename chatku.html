@@ -120,8 +120,6 @@
         .chat-media { max-width: 100%; max-height: 180px; border-radius: 6px; display: block; margin-top: 4px; }
         .chat-sticker { width: 90px; height: 90px; object-fit: contain; display: block; margin-top: 4px; }
         .doc-box { background: rgba(0,0,0,0.2); padding: 6px; border-radius: 4px; display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
-        .contact-box { background: rgba(0,0,0,0.2); padding: 6px; border-radius: 4px; font-size: 12px; margin-top: 4px; }
-        
         .msg-meta-row { display: flex; justify-content: space-between; align-items: center; font-size: 9px; margin-top: 6px; opacity: 0.8; gap: 15px; }
         .msg-date-left { font-family: sans-serif; }
         .msg-time-right { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #ffcc00; }
@@ -150,8 +148,9 @@
             font-size: 20px; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
 
+        /* Tampilan Lampiran Media Diatur Menjadi 3 Kolom Rapi Tanpa Tombol Kontak */
         .media-pickers {
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; margin-top: 4px;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; margin-top: 4px;
         }
         .media-pickers label, .media-pickers button {
             cursor: pointer; color: #ffcc00; background: #2a2a2a; padding: 6px 2px; border-radius: 6px; border: 1px solid #444; font-size: 10px; text-align: center; display: block; width: 100%; font-family: inherit; font-weight: bold;
@@ -228,8 +227,7 @@
             <label>🎥 Video <input type="file" id="video-input" accept="video/*"></label>
             <label>🎵 Audio <input type="file" id="audio-input" accept="audio/*"></label>
             <label>📄 Doc <input type="file" id="doc-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"></label>
-            <button onclick="sendContact()">📇 Kontak</button>
-            <button onclick="sendLocation()">📍 Gmaps</button>
+            <button id="btnLocation">📍 Gmaps</button>
             <label>📸 Kamera <input type="file" id="cam-input" accept="image/*" capture="environment"></label>
         </div>
     </div>
@@ -262,7 +260,6 @@
 </div>
 
 <script>
-    // Sinkronisasi dengan Database Utama Npoint Anda yang baru
     const API_URL = "https://api.npoint.io/ceafae155434d40f2c3c";
 
     const chatArea = document.getElementById('chatArea');
@@ -320,6 +317,17 @@
         document.getElementById('profileModal').style.display = 'none';
     }
 
+    async function loadMessages() {
+        try {
+            const res = await fetch(API_URL);
+            if (!res.ok) return;
+            const textData = await res.clone().text();
+            addTraffic(textData.length);
+            const data = await res.json();
+            if (data && data.messages) { renderChat(data.messages); }
+        } catch (e) { console.error(e); }
+    }
+
     function resetProfile() {
         document.getElementById('set-name').value = "HVC User";
         document.getElementById('set-phone').value = "";
@@ -372,18 +380,6 @@
         this.style.height = (this.scrollHeight) + 'px';
     });
 
-    // Menarik Data dari Cloud secara berkala otomatis tanpa interupsi
-    async function loadMessages() {
-        try {
-            const res = await fetch(API_URL);
-            if (!res.ok) return;
-            const textData = await res.clone().text();
-            addTraffic(textData.length);
-            const data = await res.json();
-            if (data && data.messages) { renderChat(data.messages); }
-        } catch (e) { console.error(e); }
-    }
-
     function renderChat(messages) {
         const isAtBottom = chatArea.scrollHeight - chatArea.clientHeight <= chatArea.scrollTop + 60;
         chatArea.innerHTML = '';
@@ -404,7 +400,6 @@
             else if (m.type === 'sticker') bodyHTML = `<img src="${m.text}" class="chat-sticker">`;
             else if (m.type === 'audio') bodyHTML = `<audio src="${m.text}" controls style="max-width:100%; height:32px; margin-top:4px;"></audio>`;
             else if (m.type === 'doc') bodyHTML = `<div class="doc-box">📄 <a href="${m.text}" target="_blank" style="color:#ffcc00; font-weight:bold;">Buka Dokumen</a></div>`;
-            else if (m.type === 'contact') bodyHTML = `<div class="contact-box">📇 <b>Nama:</b> ${m.text.name}<br>📞 <b>No:</b> ${m.text.phone}</div>`;
             else if (m.type === 'location') bodyHTML = `<div class="doc-box">📍 <a href="${m.text}" target="_blank" style="color:#ffcc00; font-weight:bold;">Lihat Lokasi Gmaps</a></div>`;
 
             row.innerHTML = `
@@ -422,11 +417,9 @@
         if (isAtBottom) chatArea.scrollTop = chatArea.scrollHeight;
     }
 
-    // Polling sinkronisasi global tiap 3 detik otomatis
     setInterval(loadMessages, 3000);
     loadMessages();
 
-    // Sistem pengiriman berbasis Cloud Fetch Terpercaya
     async function sendData(content, cType = 'text') {
         const user = userSelect.value;
         const now = new Date();
@@ -443,7 +436,6 @@
 
             currentData.messages.push({ user: user, text: content, type: cType, time: timeStr, date: dateStr });
 
-            // Pengiriman via POST yang sudah disinkronkan CORS aman bypass
             const sendRes = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -453,7 +445,7 @@
             if(sendRes.ok) {
                 chatInput.value = '';
                 chatInput.style.height = '42px';
-                loadMessages(); // Langsung render update chat terbaru
+                loadMessages();
             }
         } catch (e) { alert("Gagal mengirim data ke server cloud!"); }
     }
@@ -464,16 +456,14 @@
     }
 
     sendBtn.addEventListener('click', function(e) { e.preventDefault(); triggerSendAction(); });
-    sendBtn.addEventListener('touchstart', function(e) { e.preventDefault(); triggerSendAction(); });
 
     chatInput.addEventListener('keydown', (e) => {
         if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); triggerSendAction(); }
     });
 
-    // Metode Unggah Media Memakai Pembacaan Temporary Server 30 Hari
     async function uploadMedia(file, targetType) {
         if(!file) return;
-        chatInput.placeholder = "Mengunggah data ke cloud 30 hari...";
+        chatInput.placeholder = "Mengunggah data ke cloud...";
         chatInput.disabled = true;
         const fd = new FormData();
         fd.append("reqtype", "fileupload");
@@ -484,7 +474,7 @@
             const res = await fetch("https://corsproxy.io/?" + encodeURIComponent("https://litterbox.catbox.moe/resources/internals/api.php"), { method: "POST", body: fd });
             if(res.ok) { const url = await res.text(); sendData(url, targetType); }
             else { alert("Upload media gagal."); }
-        } catch(e) { alert("Kesalahan koneksi upload media cloud."); }
+        } catch(e) { alert("Kesalahan koneksi upload."); }
         finally {
             chatInput.placeholder = "Ketik pesan di sini..."; chatInput.disabled = false;
             document.getElementById('media-input').value = ''; document.getElementById('video-input').value = '';
@@ -501,20 +491,14 @@
     document.getElementById('doc-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'doc'));
     document.getElementById('cam-input').addEventListener('change', (e) => uploadMedia(e.target.files[0], 'camera'));
 
-    function sendContact() {
-        const name = prompt("Masukkan nama kontak:");
-        const phone = prompt("Masukkan nomor telepon:");
-        if(name && phone) sendData({name, phone}, 'contact');
-    }
-    
-    function sendLocation() {
+    document.getElementById('btnLocation').addEventListener('click', function() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition((pos) => {
                 const url = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
                 sendData(url, 'location');
             }, () => { sendData("https://www.google.com/maps?q=-6.200000,106.816666", 'location'); });
         }
-    }
+    });
 </script>
 </body>
 </html>
